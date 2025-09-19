@@ -1,81 +1,85 @@
-#include <array>
-#include <tuple>
+#include "servo_constants.h"
+#include "servo.h"
 
-// the clock speed (Hz) of the ATmega328
-constexpr double CLOCK_SPEED = 16_000_000;
+Servo::Servo(unsigned int angle = 0) : angle{angle} {}
 
-// the period of each pulse in the servo's PWM waveform (sec.)
-constexpr double SERVO_PULSE_PERIOD = 0.02;
+void Servo::setup() {
+  cli();
 
-// the duty cycle of the PWM defines the angle of the servo.
-// ex. on the servo we are given:
-// 1000 microsec duty cycle = 0 degrees
-// 1500 microsec duty cycle = 90 degrees
-// 2000 microsec duty cycle = 180 degrees
+  // stop timer1
+  TCNT1 = 0;
+  TCCR1A = 0;
+  TCCR1B = 0;
 
-// the lower bound for the duty cycle length (sec.)
-constexpr double SERVO_DUTY_CYCLE_LOW_BOUND = 0.001;
+  DDRB |= (1 << 3);
 
-// the upper bound for the duty cycle length (sec.)
-constexpr double SERVO_DUTY_CYCLE_UP_BOUND = 0.002;
+  /*
+   * Timer configuration.
+   *
+   * Compare output mode (normal mode)
+   * COM1A1 (TCCR1A:7) = 0
+   * COM1A0 (TCCR1A:6) = 0
+   * COM1B1 (TCCR1A:5) = 0
+   * COM1B0 (TCCR1A:4) = 0
+   *
+   * Normal mode
+   * WGM10 (TCCR1A:0) = 0
+   * WGM11 (TCCR1A:1) = 0
+   * WGM12 (TCCR1B:3) = 0
+   * WGM13 (TCCR1B:4) = 0
+   *
+   * Pre-scalar (001 = clk/8)
+   * CS22 (TCCR1B:2) = highest bit
+   * CS21 (TCCR1B:1)
+   * CS20 (TCCR1B:0) = lowest bit
+   *
+   * Interrupt mask register
+   * TOIE1 = 1 = enable overflow interrupt
+   * OCIE1A = 1 = enable comp A match interrupt
+   * OCIE1B = 1 = enable comp B match interrupt
+   *
+   * All other bits are reserved or 0 in this config.
+   */
 
-// the PWM output pin
-constexpr int PWM_OUTPUT_PIN = 9;
+  TCCR1A = 0b00000000;
+  TCCR1B = 0b00000000 | (1 << WGM12) | PRESCALAR_MASK;
+  this->write(angle);
+  OCR1B = TOP;
 
-// the maximum count - 1 the timer can reach before overflowing
-constexpr double TIMER_MAX_COUNT = 1 << 16;
+  // enable global interrupt bit
+  TIMSK1 = (1 << TOIE1) | (1 << OCIE1A) | (1 << OCIE1B);
 
-// chooses:
-// 1. smallest prescalar value for TIMER_OVERFLOW_TIME > SERVO_PULSE_PERIOD
-// 2. the TIMER_OVERFLOW_TIME corresponding with that prescalar value
-constexpr double compute_overflow_time(prescalar double) {
-  return TIMER_MAX_COUNT * prescalar / CLOCK_SPEED;
-}
-constexpr std::tuple<int, double> choose_prescalar() {
-  std::array<double> steps {1, 8, 32, 64, 128, 256, 1024};
-  for (double prescalar : steps) {
-    double overflow_time = compute_overflow_time(prescalar);
-    if (overflow_time < SERVO_PULSE_PERIOD) {
-      continue;
-    }
-    return std::make_tuple(prescalar, overflow_time);
-  }
-  static_assert(true, "No prescalar value can make the hardware timer overflow time exceed the servo pulse period");
-}
-constexpr double [TIMER_PRESCALAR, TIMER_OVERFLOW_TIME] = choose_prescalar();
-
-
-Servo::Servo(unsigned int angle = 0) : angle{angle} {
   pinMode(PWM_OUTPUT_PIN, OUTPUT);
 
-  // Timer configuration.
-  //
-  // Non-inverting compare output mode (OC1A output is Fast PWM non-inverting mode, OC1B output disabled)
-  // COM1A1 (TCCR1A:7) = 1
-  // COM1A0 (TCCR1A:6) = 0
-  // COM1B1 (TCCR1A:5) = 0
-  // COM1B0 (TCCR1A:4) = 0
-  //
-  // Fast PWM mode with TOP =
-  // WGM21 (TCCR1A:1) = 1
-  // WGM20 (TCCR1A:0) = 1
-  // WGM22 (TCCR1B:3) = 1
-  //
-  // Pre-scalar (clk/128)
-  // CS22 (TCCR1B:2) = 1
-  // CS21 (TCCR1B:1) = 0
-  // CS20 (TCCR1B:0) = 1
-  //
-  // All other bits are reserved or 0 in this config.
-  TCCR1A = 0b1000_0011;
-  TCCR1B = 0b0000_1101;
+  sei();
+
+}
+
+ISR(TIMER1_OVF_vect) {
+  PORTD |= (1 << 3);
+}
+ISR(TIMER1_COMPA_vect) {
+  PORTD &= ~(1 << 3);
+}
+ISR(TIMER1_COMPB_vect) {
+  TCNT1 = 0;
 }
 
 void Servo::write(unsigned int angle) {
-  this.angle = angle / 180.0;
-}
+  if (angle < 0) {
+    angle = 0;
+  }
+  if (angle >= 180) {
+    angle = 180;
+  }
+  this->angle = angle;
 
-unsigned int Servo::getAngle() {
-  return (unsigned int) (this.angle * 180);
+  uint16_t MATCH_A = MATCH_A_COEFF * angle + MATCH_A_OFFSET;
+
+  // this is a 16-bit write, so it is technically 2 instructions which
+  // technically opens the door for race conditions with interrupts, but in our
+  // case that probably won't ever happen
+  // OCR1A = MATCH_A;
+  OCR1A = MATCH_A;
 }
 

@@ -7,9 +7,10 @@ private:
   double angle;
 
 public:
-  Servo(unsigned int angle = 0);
-  void write(unsigned int angle);
-  unsigned int getAngle();
+  Servo(double angle = 0);
+  void write(double angle);
+  void setup(void);
+  double getAngle(void);
 };
 
 #endif
