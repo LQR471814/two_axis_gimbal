@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /**
  * This is a library that allows one to emit PWM with a hardware timer on the
@@ -89,32 +90,77 @@ int main(void) {
 
   double SERVO_DUTY_CYCLE_LENGTH =
       SERVO_DUTY_CYCLE_UP_BOUND - SERVO_DUTY_CYCLE_LOW_BOUND;
-  uint8_t PWM_OUTPUT_PIN = 9;
+  uint8_t PWM_OUTPUT_PIN = 3;
   uint8_t PRESCALAR_MASK = PRESCALAR_INDEX + 1;
-  uint16_t TOP = SERVO_PULSE_PERIOD / TIMER_TOTAL_PERIOD * TIMER_MAX_COUNT;
+  uint16_t TOP = SERVO_PULSE_PERIOD / TIMER_TOTAL_PERIOD * TIMER_MAX_COUNT - 1;
 
-  printf("constexpr double SERVO_DUTY_CYCLE_LENGTH = %lf;\n",
-         SERVO_DUTY_CYCLE_LENGTH);
-  printf("constexpr double SERVO_DUTY_CYCLE_LOW_BOUND = %lf;\n",
-         SERVO_DUTY_CYCLE_LOW_BOUND);
-  printf("constexpr double TIMER_TOTAL_PERIOD = %lf;\n", TIMER_TOTAL_PERIOD);
-  printf("constexpr double TIMER_MAX_COUNT = %lf;\n", TIMER_MAX_COUNT);
   printf("constexpr unsigned char PWM_OUTPUT_PIN = %d;\n", PWM_OUTPUT_PIN);
-  printf("constexpr unsigned char PRESCALAR_MASK = 0b%b;\n", PRESCALAR_MASK);
-  printf("constexpr unsigned short TOP = %d; // period error: %lf%% \n",
-         TOP,
+  printf("constexpr unsigned char PRESCALAR_MASK = 0b%08b;\n", PRESCALAR_MASK);
+  printf("constexpr unsigned int TOP = %d; // period error: %lf%% \n", TOP,
          fabs(TOP * PRESCALAR_STEPS[PRESCALAR_INDEX] / CLOCK_SPEED -
               SERVO_PULSE_PERIOD) /
              SERVO_PULSE_PERIOD * 100);
 
-  for (double angle = 0; angle < 180; angle += 5) {
+  /**
+   * x = angle
+   * a = SERVO_DUTY_CYCLE_LENGTH
+   * b = SERVO_DUTY_CYCLE_LOW_BOUND
+   * c = TIMER_TOTAL_PERIOD
+   * d = TIMER_MAX_COUNT
+   *
+   * (x / 180 * a + b) / c * d - 1
+   * P = a / 180
+   * Q = d / c
+   * (x * P + b) * Q - 1
+   * x * P * Q + b * Q - 1
+   * m = P * Q
+   * n = b * Q - 1
+   * mx + n
+   */
+
+  double match_a_coeff =
+      SERVO_DUTY_CYCLE_LENGTH / 180 * TIMER_MAX_COUNT / TIMER_TOTAL_PERIOD;
+  printf("constexpr unsigned int MATCH_A_COEFF = %d;\n",
+         (unsigned int)match_a_coeff);
+
+  double match_a_offset =
+      SERVO_DUTY_CYCLE_LOW_BOUND * TIMER_MAX_COUNT / TIMER_TOTAL_PERIOD - 1;
+  printf("constexpr unsigned int MATCH_A_OFFSET = %d;\n",
+         (unsigned int)match_a_offset);
+
+  // compute expected error
+  unsigned int scalar = 5;
+  unsigned int n = 180 / scalar;
+  double *errors = (double *)malloc(sizeof(double) * (180 / 5));
+  for (int i = 0; i < n; i++) {
+    double angle = scalar * i;
     double duty_cycle =
         angle / 180 * SERVO_DUTY_CYCLE_LENGTH + SERVO_DUTY_CYCLE_LOW_BOUND;
     uint16_t MATCH_A = duty_cycle / TIMER_TOTAL_PERIOD * TIMER_MAX_COUNT;
-    printf("// angle: %lf, duty cycle error: %lf%%\n", angle,
-           fabs(MATCH_A / TIMER_MAX_COUNT * TIMER_TOTAL_PERIOD - duty_cycle) /
-               duty_cycle * 100);
+    errors[i] =
+        fabs(MATCH_A / TIMER_MAX_COUNT * TIMER_TOTAL_PERIOD - duty_cycle) /
+        duty_cycle;
   }
+  for (int i = 0; i < n; i++) {
+    double current = errors[i];
+    double maxvalue = -1;
+    int max = -1;
+    for (int j = i + 1; j < n; j++) {
+      double cmp = errors[j];
+      if (cmp > maxvalue) {
+        max = j;
+        maxvalue = cmp;
+      }
+    }
+    if (max < 0) {
+      break;
+    }
+    errors[i] = maxvalue;
+    errors[max] = current;
+  }
+  printf("// p95 error: %lf%%, p50 error: %lf%%\n",
+         errors[n - n * 95 / 100] * 100, errors[n - n / 2] * 100);
+  free(errors);
 
   return 0;
 }

@@ -4,13 +4,12 @@
 class Servo {
 private:
   // angle is a value from [0, 1]
-  double angle;
+  unsigned int angle;
 
 public:
-  Servo(double angle = 0);
-  void write(double angle);
-  void setup(void);
-  double getAngle(void);
+  Servo(unsigned int angle = 0);
+  void write(unsigned int angle);
+  void setup();
 };
 
 #endif

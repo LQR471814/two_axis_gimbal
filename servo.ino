@@ -11,22 +11,20 @@ void Servo::setup() {
   TCCR1A = 0;
   TCCR1B = 0;
 
-  DDRB |= (1 << 3);
-
   /*
    * Timer configuration.
    *
-   * Compare output mode (normal mode)
-   * COM1A1 (TCCR1A:7) = 0
+   * Compare output mode (non-inverting mode)
+   * COM1A1 (TCCR1A:7) = 1
    * COM1A0 (TCCR1A:6) = 0
    * COM1B1 (TCCR1A:5) = 0
    * COM1B0 (TCCR1A:4) = 0
    *
-   * Normal mode
+   * Fast PWM mode
    * WGM10 (TCCR1A:0) = 0
-   * WGM11 (TCCR1A:1) = 0
-   * WGM12 (TCCR1B:3) = 0
-   * WGM13 (TCCR1B:4) = 0
+   * WGM11 (TCCR1A:1) = 1
+   * WGM12 (TCCR1B:3) = 1
+   * WGM13 (TCCR1B:4) = 1
    *
    * Pre-scalar (001 = clk/8)
    * CS22 (TCCR1B:2) = highest bit
@@ -34,17 +32,16 @@ void Servo::setup() {
    * CS20 (TCCR1B:0) = lowest bit
    *
    * Interrupt mask register
-   * TOIE1 = 1 = enable overflow interrupt
-   * OCIE1A = 1 = enable comp A match interrupt
-   * OCIE1B = 1 = enable comp B match interrupt
+   * OCIE1B = 1
    *
    * All other bits are reserved or 0 in this config.
    */
 
-  TCCR1A = 0b00000000;
-  TCCR1B = 0b00000000 | (1 << WGM12) | PRESCALAR_MASK;
+  TCCR1A = 0b10000010;
+  TCCR1B = 0b00011000 | PRESCALAR_MASK;
+  ICR1   = TOP;
+
   this->write(angle);
-  OCR1B = TOP;
 
   // enable global interrupt bit
   TIMSK1 = (1 << TOIE1) | (1 << OCIE1A) | (1 << OCIE1B);
@@ -52,16 +49,14 @@ void Servo::setup() {
   pinMode(PWM_OUTPUT_PIN, OUTPUT);
 
   sei();
-
 }
 
-ISR(TIMER1_OVF_vect) {
-  PORTD |= (1 << 3);
-}
-ISR(TIMER1_COMPA_vect) {
-  PORTD &= ~(1 << 3);
-}
-ISR(TIMER1_COMPB_vect) {
+#if defined(TIM1_COMPB_vect)
+ISR(TIM1_COMPB_vect)
+#else
+ISR(TIMER1_COMPB_vect)
+#endif
+{
   TCNT1 = 0;
 }
 

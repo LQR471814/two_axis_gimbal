@@ -1,30 +1,20 @@
-// #include "servo.h"
+#include "servo.h"
 
-// Servo servo;
+Servo servo;
 
 void setup(void) {
-  // Serial.begin(9600);
-  // Serial.write("Hello!\n");
-  pinMode(LED_BUILTIN, OUTPUT);
-  // servo.setup();
+  servo.setup();
 }
 
-// int pos = 0;
-
 void loop(void) {
-  // Serial.write("Hello!\n");
-  // delay(100);
-  // for (pos = 0; pos <= 180; pos += 1) {
-  //   servo.write((double) pos);
-  //   delay(15);
-  // }
-  // for (pos = 180; pos >= 0; pos -= 1) {
-  //   servo.write((double) pos);
-  //   delay(15);
-  // }
-  digitalWrite(LED_BUILTIN, HIGH);   // turn the LED on
-  delay(1000);                  // wait for 1 second
-  digitalWrite(LED_BUILTIN, LOW);    // turn the LED off
-  delay(1000);                  // wait for 1 second
+  // Sweep from 0° to 180° and back
+  for (unsigned int pos = 0; pos <= 180; pos++) {
+    servo.write(pos);
+    delay(15);
+  }
+  for (unsigned int pos = 180; pos >= 0; pos--) {
+    servo.write(pos);
+    delay(15);
+  }
 }
 
