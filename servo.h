@@ -3,7 +3,7 @@
 
 class Servo {
 private:
-  // angle is a value from [0, 1]
+  // angle is a value from [0, 1000]
   unsigned int angle;
 
 public:

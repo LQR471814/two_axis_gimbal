@@ -37,39 +37,47 @@ void Servo::setup() {
    * All other bits are reserved or 0 in this config.
    */
 
-  TCCR1A = 0b10000010;
-  TCCR1B = 0b00011000 | PRESCALAR_MASK;
-  ICR1   = TOP;
+  // phase correct PWM
+  //
+  // to_sec(count) = count * pre_scalar / (16 * 10^6)
+  // TOP = ICR1
+  // duty_cycle = 2 * to_sec(TOP - ICR1)
+  // full_period = duty_cycle + 2 * to_sec(ICR1)
+
+  // prescalar = 8
+  // phase correct PWM
+  // toggle on compare match
+
+  TCCR1A = (1 << WGM11) | (1 << COM1A0);
+  TCCR1B = (1 << WGM13) | (1 << CS11);
+  ICR1 = 20000;
 
   this->write(angle);
 
-  // enable global interrupt bit
-  TIMSK1 = (1 << TOIE1) | (1 << OCIE1A) | (1 << OCIE1B);
+  // // enable global interrupt bit
+  // TIMSK1 = (1 << TOIE1) | (1 << OCIE1A) | (1 << OCIE1B);
 
   pinMode(PWM_OUTPUT_PIN, OUTPUT);
 
   sei();
 }
 
-#if defined(TIM1_COMPB_vect)
-ISR(TIM1_COMPB_vect)
-#else
-ISR(TIMER1_COMPB_vect)
-#endif
-{
-  TCNT1 = 0;
-}
+// #if defined(TIM1_COMPB_vect)
+// ISR(TIM1_COMPB_vect)
+// #else
+// ISR(TIMER1_COMPB_vect)
+// #endif
+// {
+//   TCNT1 = 0;
+// }
 
 void Servo::write(unsigned int angle) {
-  if (angle < 0) {
-    angle = 0;
-  }
-  if (angle >= 180) {
-    angle = 180;
+  if (angle >= 1000) {
+    angle = 1000;
   }
   this->angle = angle;
 
-  uint16_t MATCH_A = MATCH_A_COEFF * angle + MATCH_A_OFFSET;
+  uint16_t MATCH_A = 18000 + angle;
 
   // this is a 16-bit write, so it is technically 2 instructions which
   // technically opens the door for race conditions with interrupts, but in our
