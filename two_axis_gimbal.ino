@@ -25,8 +25,8 @@ static void setup(void) {
 }
 
 static void loop(void) {
-  int gyro[3];
-  int accel[3];
+  uint16_t gyro[3];
+  uint16_t accel[3];
 
   PRINT_ERR(Gyro::read(gyro, accel), "Gyro read failed!", delay(1000); reset_gyro(); return);
 

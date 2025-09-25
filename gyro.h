@@ -3,7 +3,7 @@
 
 namespace Gyro {
 	uint8_t setup(void);
-	uint8_t read(int (&gyro)[3], int (&accel)[3]);
+	uint8_t read(uint16_t gyro[3], uint16_t accel[3]);
 };
 
 #endif
