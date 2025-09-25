@@ -11,19 +11,6 @@ static constexpr int GYRO_REG = 0x43;
 #define TRY(expr, catch) expr;
 #endif
 
-/**
- * Notes on the Wire.h library.
- *
- * beginTransmission() -> doesn't actually send anything, just sets some
- * configuration variables.
- *
- * write() -> writes a value to a buffer and updates some variables, doesn't
- * send anything either. returns 0 if buffer is full
- *
- * endTransmission() -> actually executes the send, this includes the address
- * and the things inside the buffer
- */
-
 static uint8_t write_reg(uint8_t reg, uint8_t value) {
     Wire.beginTransmission(MPU_ADDR);
     TRY(Wire.write(reg) == 0, return 1);
@@ -34,28 +21,26 @@ static uint8_t write_reg(uint8_t reg, uint8_t value) {
 
 namespace Gyro {
   uint8_t setup(void) {
-    // reg: 0x6B
-    // value: DEVICE_RESET
-    TRY(write_reg(0x6B, 0b10000000), return err);
-
-    // wait 100ms for reset to complete
+    // reg: PWR_MGMT_1
+    // value: trigger DEVICE_RESET
+    TRY(write_reg(0x6B, 1 << 7), return err);
     delay(100);
 
     // reg: PWR_MGMT_1
     // value: disables sleep mode, uses PLL with X axis gyro for clock
-    TRY(write_reg(0x6B, 0), return err + 10);
+    TRY(write_reg(0x6B, 0x01), return err + 10);
 
     // reg: PWR_MGMT_2
     // value: all disabled
-    TRY(write_reg(0x6C, 0), return err + 20);
+    TRY(write_reg(0x6C, 0x00), return err + 20);
 
     // reg: GYRO_CONFIG
-    // enable self test and use FSR +-250
-    TRY(write_reg(0x1B, 0), return err + 30);
+    // use range +-250
+    TRY(write_reg(0x1B, 0x00), return err + 30);
 
     // reg: ACCEL_CONFIG
-    // enable self test and use FSR +-8g
-    TRY(write_reg(0x1C, 0b10), return err + 40);
+    // use range +-8g
+    TRY(write_reg(0x1C, 0x02), return err + 40);
 
     return 0;
   }
