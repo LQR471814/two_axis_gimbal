@@ -24,11 +24,6 @@ namespace Gyro {
 
   uint8_t setup(void) {
     // reg: PWR_MGMT_1
-    // value: trigger DEVICE_RESET
-    TRY(write_reg(0x6B, 1 << 7), return err)
-    delay(100);
-
-    // reg: PWR_MGMT_1
     // value: disables sleep mode, uses PLL with X axis gyro for clock
     TRY(write_reg(0x6B, 0x01), return err + 10)
 
@@ -41,8 +36,8 @@ namespace Gyro {
     TRY(write_reg(0x1B, 0x00), return err + 30)
 
     // reg: ACCEL_CONFIG
-    // use range +-8g
-    TRY(write_reg(0x1C, 0x02), return err + 40)
+    // use range +-2g
+    TRY(write_reg(0x1C, 0x00), return err + 40)
 
     return 0;
   }
@@ -70,7 +65,6 @@ namespace Gyro {
 
     uint8_t err;
 
-// retry if data corrupted
 #define READ16(out, errprefix) err = read16(&(out)); \
     if (err != 0) { return errprefix + err; }
 
